@@ -1,4 +1,4 @@
-# 运行产物
+﻿# 运行产物
 tone-log.json
 *.log
 
@@ -14,3 +14,6 @@ node_modules/
 .DS_Store
 Thumbs.db
 desktop.ini
+
+# 本机专用的推送脚本（含本机 git 路径）
+push-to-github.cmd
