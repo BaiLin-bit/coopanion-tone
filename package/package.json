@@ -7,7 +7,9 @@
   "files": [
     "src",
     "dist",
-    "README.md"
+    "README.md",
+    "describe.json",
+    "CHANGELOG.md"
   ],
   "keywords": [
     "cortico-world",
@@ -22,6 +24,10 @@
     "api": 6,
     "displayName": "去 AI 味",
     "webUiClient": "dist/webui.js",
-    "webUiStyle": "dist/webui.css"
+    "webUiStyle": "dist/webui.css",
+    "describe": "describe.json",
+    "tags": [
+      "companion"
+    ]
   }
 }
