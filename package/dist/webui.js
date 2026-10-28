@@ -44,8 +44,8 @@ function copyText(text, ui) {
 function mountToneLog(ctx) {
   const { root, ui } = ctx;
 
-  // 声明必须在使用之前：下面的接入指南文案会立即读 currentPort。
-  let currentPort = null;
+  // 声明必须在使用之前：下面的接入指南文案会立即读 currentUrl。
+  let currentUrl = null;
   let stopped = false;
 
   const wrap = el('div', 'ctl-wrap');
@@ -70,25 +70,34 @@ function mountToneLog(ctx) {
 
   const snippet = [
     '// 示例：QQ 的 qq_send（cortico-world-qq-final-beta / qqbot）',
-    'const r = await fetch(`http://127.0.0.1:<端口>/check`, {',
-    "  method: 'POST',",
-    "  headers: { 'content-type': 'application/json' },",
-    "  body: JSON.stringify({ text, where: 'qq_send' }),",
-    '}).then((x) => x.json());',
-    'if (r.block) return { text: r.block, failed: true };   // 拦下：这句话没发出去',
-    '// block 为 null 就照常发',
+    '// 地址别写死：优先环境变量，其次读 tone-service.json，都没有就用默认值。',
+    'let blocked = null;',
+    'try {',
+    "  const res = await fetch('<地址>/check', {",
+    "    method: 'POST',",
+    "    headers: { 'content-type': 'application/json' },",
+    "    body: JSON.stringify({ text, where: 'qq_send' }),",
+    '    signal: AbortSignal.timeout(1500),',
+    '  });',
+    '  if (res.ok) blocked = (await res.json()).block;',
+    '} catch {',
+    '  // 检查服务不在 / 超时 / 端口变了 —— 照常发送，别把话吞了',
+    '}',
+    'if (blocked) return { text: blocked, failed: true };   // 拦下：这句话没发出去',
   ].join('\n');
   const pre = el('pre', 'ctl-code', snippet);
   const copyBtn = el('button', 'ctl-btn', '复制这段示例');
   copyBtn.type = 'button';
-  copyBtn.addEventListener('click', () => copyText(snippet.replace('<端口>', String(currentPort || '18770')), ui));
+  copyBtn.addEventListener('click', () => copyText(snippet.replace('<地址>', currentUrl || 'http://127.0.0.1:18770'), ui));
+
+  const failNote = el('p', 'ctl-guide-p ctl-warn', '注意：一定保留 try/catch 和 1.5 秒超时。裸写 await fetch 的话，检查服务一挂，你的发言就发不出去了。');
 
   const idNote = el('p', 'ctl-guide-p', '四个世界的包名 / world id / 工具名 / 文件位置，见仓库里的 docs/接入指南.md。别搞混：cortico-world-qq（id qq，工具 qq.send）和 cortico-world-qq-final-beta（id qqbot，工具 qq_send）是两个不同的包。');
 
   const promptText = [
     '帮我改一下这个 Coopanion 安装里的发言出口，让它在发送前先问一下本地的腔调检查服务。',
     '',
-    '服务地址：http://127.0.0.1/' + (currentPort || '18770') + '/check',
+    '服务地址：' + (currentUrl || 'http://127.0.0.1:18770') + '/check',
     '方法：POST，Content-Type: application/json',
     '请求体：{"text": "<要发出去的正文>", "where": "<来源名，比如 qq_send>"}',
     '返回：{"ok":true,"level":"通过|轻|中|重","density":数字,"hits":"命中的毛病","block":null 或 "拦截文案"}',
@@ -108,21 +117,21 @@ function mountToneLog(ctx) {
 
   const warn = el('p', 'ctl-guide-p ctl-warn', '注意：改的是 Coopanion 安装目录里的文件，升级会被覆盖。改之前务必备份，改完记下改了哪里。');
 
-  guideBody.append(intro, snippetTitle, pre, copyBtn, idNote, promptPre, copyPromptBtn, warn);
+  guideBody.append(intro, snippetTitle, pre, copyBtn, failNote, idNote, promptPre, copyPromptBtn, warn);
   guide.append(summary, guideBody);
 
   wrap.append(head, serviceLine, note, list, empty, guide);
   root.appendChild(wrap);
 
-  // stopped / currentPort 已在函数开头声明
+  // stopped / currentUrl 已在函数开头声明
 
   function renderService(service) {
-    currentPort = service?.port ?? null;
+    currentUrl = service?.url ?? null;
     if (service?.port) {
-      serviceLine.textContent = '检查服务：运行中 → http://127.0.0.1:' + service.port + '/check';
+      serviceLine.textContent = '检查服务：运行中 → ' + service.url;
       serviceLine.className = 'ctl-service ctl-service-on';
     } else {
-      serviceLine.textContent = '检查服务：未启动（端口被占用或扩展未加载）——接入会失败，先看 Coopanion 日志。';
+      serviceLine.textContent = '检查服务：未启动（端口全被占或扩展未加载）——接入会失败，先看 Coopanion 日志。';
       serviceLine.className = 'ctl-service ctl-service-off';
     }
   }

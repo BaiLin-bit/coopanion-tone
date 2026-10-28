@@ -46,6 +46,30 @@ export function readToneLog(): ToneLogEntry[] {
   }
 }
 
+/** 服务地址的发现文件；接入方读它，而不是猜端口。 */
+export function serviceInfoPath(): string {
+  return process.env.COOPANION_TONE_SERVICE_FILE
+    || join(homedir(), 'Coopanion', 'data', 'home', 'companion', 'data', 'tone-service.json');
+}
+
+export interface ToneServiceInfo {
+  url: string;
+  port: number;
+  service: string;
+  version: number;
+  since: string;
+}
+
+/** 读服务地址；文件不在（服务没起）时返回 null。 */
+export function readServiceInfo(): ToneServiceInfo | null {
+  try {
+    const parsed = JSON.parse(readFileSync(serviceInfoPath(), 'utf8')) as ToneServiceInfo;
+    return parsed && typeof parsed.url === 'string' ? parsed : null;
+  } catch {
+    return null;
+  }
+}
+
 /** 只留最近这么多条，多了从最老的丢。 */
 export const TONE_LOG_MAX = 15;
 

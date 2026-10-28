@@ -80,7 +80,7 @@ class DeaiWorld {
         if (method === 'list') {
           return {
             items: readToneLog(),
-            service: this.service ? { port: this.service.port, url: `http://127.0.0.1:${this.service.port}` } : null,
+            service: this.service ? { port: this.service.port, url: this.service.url } : null,
           };
         }
         throw new Error(`未知方法: ${method}`);
