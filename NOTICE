@@ -29,15 +29,17 @@ coopanion-tone
 修改说明
 --------
 
-patcher/ 目录下的脚本不包含上述项目的完整源码，只包含「在指定位置插入若干行」的
-文本片段与被修改文件的锚点。但它会修改用户本机上的上述项目文件，且
-patcher/coopanion-tone-check.ts.src 是 Coopanion 框架层新增模块的完整源码
-（由本项目编写，运行在 Coopanion 进程内）。
+package/ 是本项目原创的 Coopanion 扩展（World id: deai），不含上游代码：
+规则表、日志读写、本地检查服务、WebUI 面板都是原创。
 
-具体改动（每个文件都只做插入，不重写原逻辑）：
+examples/patcher/ 目录下的脚本不包含上述上游项目的完整源码，只包含「在指定位置
+插入若干行」的文本片段与被修改文件的锚点。它会修改用户本机上的上游项目文件，
+因此**不属于 Coopanion 插件市场分发的扩展**，仅作为参考实现保留。
+
+patcher 具体改动（每个文件都只做插入，不重写原逻辑）：
 
   resources\app\build\cortico\src\core\tone-check.ts
-    新增文件（本项目原创）：规则表、闸门 toneGate、记账 appendToneLog
+    新增文件：规则表、闸门 toneGate、记账 appendToneLog
 
   resources\app\node_modules\cortico-world-desktop-pet\src\world.ts
     1) 增加 toneNote 软加载块

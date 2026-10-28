@@ -12,8 +12,8 @@
  *   1. 环境变量 COOPANION_TONE_LOG（想挪位置就设它）
  *   2. <用户目录>/Coopanion/data/home/companion/data/tone-log.json
  */
-import { readFileSync } from 'node:fs';
-import { join } from 'node:path';
+import { readFileSync, writeFileSync, mkdirSync } from 'node:fs';
+import { join, dirname } from 'node:path';
 import { homedir } from 'node:os';
 
 export interface ToneLogEntry {
@@ -43,5 +43,32 @@ export function readToneLog(): ToneLogEntry[] {
     return Array.isArray(parsed.items) ? parsed.items.slice().reverse() : [];
   } catch {
     return [];
+  }
+}
+
+/** 只留最近这么多条，多了从最老的丢。 */
+export const TONE_LOG_MAX = 15;
+
+function nowText(): string {
+  const d = new Date();
+  const p = (n: number) => String(n).padStart(2, '0');
+  return `${d.getFullYear()}-${p(d.getMonth() + 1)}-${p(d.getDate())} ${p(d.getHours())}:${p(d.getMinutes())}:${p(d.getSeconds())}`;
+}
+
+/** 记一条。写不进去就算了，绝不影响调用方。 */
+export function appendToneLog(entry: Omit<ToneLogEntry, 'time'>): void {
+  try {
+    const path = toneLogPath();
+    let items: ToneLogEntry[] = [];
+    try {
+      const parsed = JSON.parse(readFileSync(path, 'utf8')) as { items?: ToneLogEntry[] };
+      if (Array.isArray(parsed.items)) items = parsed.items;
+    } catch { /* 文件不在或坏了，从头来 */ }
+    items.push({ time: nowText(), ...entry });
+    while (items.length > TONE_LOG_MAX) items.shift();
+    mkdirSync(dirname(path), { recursive: true });
+    writeFileSync(path, JSON.stringify({ items }, null, 2), 'utf8');
+  } catch {
+    // 记录失败不影响说话
   }
 }

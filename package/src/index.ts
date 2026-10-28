@@ -5,6 +5,7 @@ import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { report } from './deai.ts';
 import { readToneLog } from './tone.ts';
+import { startToneService, type ToneService } from './server.ts';
 
 const here = dirname(fileURLToPath(import.meta.url));
 const ENV_PROMPT_PATH = join(here, 'ENV_PROMPT.md');
@@ -42,6 +43,8 @@ const CHECK_TOOL = {
 
 class DeaiWorld {
   readonly id = 'deai';
+  /** 本地检查服务；端口被占时为 null，不影响扩展本身。 */
+  private service: ToneService | null = null;
 
   /** 模板没有变量，返回空对象表示「保留模板全文」。 */
   envPromptVars() {
@@ -52,9 +55,14 @@ class DeaiWorld {
     return [CHECK_TOOL];
   }
 
-  async start() {}
+  async start() {
+    this.service = await startToneService();
+  }
 
-  async stop() {}
+  async stop() {
+    await this.service?.stop();
+    this.service = null;
+  }
 
   webUi() {
     return {
@@ -63,13 +71,18 @@ class DeaiWorld {
         {
           id: 'tone-log',
           title: '腔调记录',
-          description: '最近 15 条：被闸门拦下的话，和真发出去的话。',
+          description: '最近 15 条：被拦下的话，和真发出去的话。',
           getMethods: ['list'],
         },
       ],
       invoke: async (panel: string, method: string) => {
         if (panel !== 'tone-log') throw new Error(`未知面板: ${panel}`);
-        if (method === 'list') return { items: readToneLog() };
+        if (method === 'list') {
+          return {
+            items: readToneLog(),
+            service: this.service ? { port: this.service.port, url: `http://127.0.0.1:${this.service.port}` } : null,
+          };
+        }
         throw new Error(`未知方法: ${method}`);
       },
       promptDocs: [

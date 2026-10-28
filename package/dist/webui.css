@@ -97,3 +97,72 @@
   font-size: 13px;
   opacity: 0.55;
 }
+
+/* ---- 服务状态与接入指南 ---- */
+
+.ctl-service {
+  font-size: 12px;
+  margin-bottom: 10px;
+}
+
+.ctl-service-on {
+  color: #5aa87a;
+}
+
+.ctl-service-off {
+  color: #d4645a;
+}
+
+.ctl-guide {
+  margin-top: 18px;
+  padding-top: 12px;
+  border-top: 1px solid rgba(127, 127, 127, 0.2);
+}
+
+.ctl-guide-title {
+  font-size: 13px;
+  font-weight: 600;
+  opacity: 0.85;
+  cursor: pointer;
+}
+
+.ctl-guide-body {
+  margin-top: 10px;
+}
+
+.ctl-guide-p {
+  font-size: 12px;
+  line-height: 1.7;
+  opacity: 0.75;
+  margin: 0 0 10px;
+}
+
+.ctl-warn {
+  color: #d4645a;
+  opacity: 0.9;
+}
+
+.ctl-code {
+  font-size: 12px;
+  line-height: 1.55;
+  padding: 10px 12px;
+  border-radius: 6px;
+  background: rgba(127, 127, 127, 0.1);
+  overflow: auto;
+  white-space: pre;
+}
+
+.ctl-btn {
+  margin: 6px 0 14px;
+  padding: 4px 10px;
+  font-size: 12px;
+  border: 1px solid rgba(127, 127, 127, 0.35);
+  border-radius: 4px;
+  background: transparent;
+  color: inherit;
+  cursor: pointer;
+}
+
+.ctl-btn:hover {
+  background: rgba(127, 127, 127, 0.12);
+}
