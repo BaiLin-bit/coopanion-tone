@@ -1,0 +1,79 @@
+coopanion-tone
+==============
+
+本项目修改了下列 AGPL-3.0-or-later 项目，并按 AGPL-3.0-or-later 发布。
+
+上游项目
+--------
+
+  Coopanion
+    Copyright (C) Pal AI Lab
+    https://github.com/Pal-AI-Lab/Coopanion
+    License: AGPL-3.0-or-later
+
+  cortico-world-desktop-pet
+    Copyright (C) Pal AI Lab
+    https://github.com/Pal-AI-Lab/Coopanion/tree/main/packages/cortico-world-desktop-pet
+    License: AGPL-3.0-or-later
+
+  cortico-world-qq-final-beta
+    Copyright (C) Pal AI Lab
+    License: AGPL-3.0-or-later
+
+  cortico-world-qzone-alont1
+    License: MIT
+
+  cortico-world-bili-scroller
+    License: MIT
+
+修改说明
+--------
+
+patcher/ 目录下的脚本不包含上述项目的完整源码，只包含「在指定位置插入若干行」的
+文本片段与被修改文件的锚点。但它会修改用户本机上的上述项目文件，且
+patcher/coopanion-tone-check.ts.src 是 Coopanion 框架层新增模块的完整源码
+（由本项目编写，运行在 Coopanion 进程内）。
+
+具体改动（每个文件都只做插入，不重写原逻辑）：
+
+  resources\app\build\cortico\src\core\tone-check.ts
+    新增文件（本项目原创）：规则表、闸门 toneGate、记账 appendToneLog
+
+  resources\app\node_modules\cortico-world-desktop-pet\src\world.ts
+    1) 增加 toneNote 软加载块
+    2) pet_say 的 say() 回执末尾追加 toneNote(...)
+
+  data\extensions\...\cortico-world-qq-final-beta\src\world.ts
+    1) 增加 toneNote/toneGate 软加载块
+    2) qq_send 工具入口插入闸门
+    3) 「已发送（编号…）」回执末尾追加 toneNote
+    4) 兜底自动发送改为发送后记账
+    5) qq_confirm_send 插入闸门与记账
+
+  data\extensions\...\cortico-world-qq-final-beta\src\qzone.ts
+    1) 增加软加载块
+    2) post() 插入闸门，发送成功后记账
+    3) replyComment() 插入闸门，发送成功后记账
+
+  data\extensions\...\cortico-world-bili-scroller\src\world.ts
+    1) 增加软加载块
+    2) commentTool() 插入闸门，发送成功后记账
+
+  data\extensions\...\cortico-world-qzone-alont1\src\world.ts
+    1) 增加软加载块
+    2) qzone_post 工具插入闸门，发送成功后记账
+
+package/ 目录
+-------------
+
+package/ 是本项目原创的 Coopanion 扩展（World id: deai），不含上游代码，
+但因其与上述 AGPL 项目在同一作品中使用，整体按 AGPL-3.0-or-later 发布，
+以保持一致。
+
+没有收录的内容
+--------------
+
+- 任何用户配置、聊天记录、角色设定、人设提示词
+- 任何令牌、密钥、账号标识
+
+如果发现本仓库包含上述内容，请提 issue，会尽快删除。

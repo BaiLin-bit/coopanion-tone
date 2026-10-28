@@ -1,0 +1,99 @@
+/* 「去 AI 味 · 腔调记录」面板样式，class 统一 ctl- 前缀。 */
+
+.ctl-wrap {
+  padding: 16px;
+  max-width: 780px;
+}
+
+.ctl-head {
+  display: flex;
+  align-items: baseline;
+  gap: 10px;
+  margin-bottom: 6px;
+}
+
+.ctl-title {
+  font-size: 16px;
+  font-weight: 600;
+}
+
+.ctl-sub {
+  font-size: 12px;
+  opacity: 0.6;
+}
+
+.ctl-note {
+  margin: 0 0 14px;
+  font-size: 12px;
+  line-height: 1.6;
+  opacity: 0.65;
+}
+
+.ctl-list {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.ctl-row {
+  padding: 10px 12px;
+  border: 1px solid rgba(127, 127, 127, 0.25);
+  border-left-width: 3px;
+  border-radius: 6px;
+}
+
+.ctl-row.ctl-block {
+  border-left-color: #d4645a;
+}
+
+.ctl-row.ctl-ok {
+  border-left-color: #5aa87a;
+}
+
+.ctl-line {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 6px;
+  font-size: 12px;
+  opacity: 0.75;
+}
+
+.ctl-tag {
+  padding: 1px 6px;
+  border-radius: 4px;
+  font-weight: 600;
+}
+
+.ctl-block .ctl-tag {
+  background: rgba(212, 100, 90, 0.16);
+  color: #d4645a;
+}
+
+.ctl-ok .ctl-tag {
+  background: rgba(90, 168, 122, 0.16);
+  color: #5aa87a;
+}
+
+.ctl-level {
+  color: #d4645a;
+}
+
+.ctl-text {
+  font-size: 14px;
+  line-height: 1.65;
+  white-space: pre-wrap;
+  word-break: break-word;
+}
+
+.ctl-hits {
+  margin-top: 6px;
+  font-size: 12px;
+  opacity: 0.7;
+}
+
+.ctl-empty {
+  font-size: 13px;
+  opacity: 0.55;
+}

@@ -1,0 +1,16 @@
+# 运行产物
+tone-log.json
+*.log
+
+# 备份与本地产物
+*.bak
+*.bak-*
+_coopanion_backup/
+
+# 依赖
+node_modules/
+
+# 系统
+.DS_Store
+Thumbs.db
+desktop.ini

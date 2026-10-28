@@ -1,0 +1,27 @@
+{
+  "name": "cortico-world-deai",
+  "version": "0.1.0",
+  "description": "去 AI 味：发言前的自查工具 deai_check + 一段说话规则环境提示词。不连平台、不管事件，挂上就生效。",
+  "type": "module",
+  "main": "./src/index.ts",
+  "files": [
+    "src",
+    "dist",
+    "README.md"
+  ],
+  "keywords": [
+    "cortico-world",
+    "cortico",
+    "deai",
+    "style"
+  ],
+  "author": "coopanion-tone contributors",
+  "license": "AGPL-3.0-or-later",
+  "cortico": {
+    "kind": "world",
+    "api": 6,
+    "displayName": "去 AI 味",
+    "webUiClient": "dist/webui.js",
+    "webUiStyle": "dist/webui.css"
+  }
+}

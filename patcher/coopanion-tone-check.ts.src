@@ -1,0 +1,305 @@
+/**
+ * 说话腔调体检（tone check）。
+ *
+ * 为什么放在这里：`pet_say` / `qq_send` 把话发出去之后，框架顺手把几行体检结果附在
+ * 工具回执里，模型下一轮就看得见自己刚才那句是什么毛病——不用它自己想起来调
+ * `deai_check`。实测那支工具的自发调用率只有 0.6%，靠自觉是没用的。
+ *
+ * 规则与 `data/extensions/cortico-world-deai/src/deai.ts` 同源，这里是精简副本：
+ * 框架不能 import 用户扩展（那个目录随时会被卸掉），所以抄了一份。改规则时两边一起改。
+ * 只报「中」以上；「轻」不出声——每句都念一遍反而更像机器。
+ *
+ * 注意：这个文件住在 Coopanion 安装目录里，升级会被覆盖。
+ * 升级后跑一次 `E:\XiaZai\新建文件夹\catbot\coopanion-tone-patch.ps1` 复原。
+ */
+import { readFileSync, writeFileSync } from 'node:fs';
+import { join } from 'node:path';
+import { homedir } from 'node:os';
+
+/**
+ * 拦截/发送记录落盘的地方；`cortico-world-deai` 的页面读同一个文件
+ * （那边 `src/tone.ts` 里是同一套路径规则，改这里要一起改）。
+ * 环境变量 COOPANION_TONE_LOG 优先，方便挪位置。
+ */
+const TONE_LOG_PATH = process.env.COOPANION_TONE_LOG
+  || join(homedir(), 'Coopanion', 'data', 'home', 'companion', 'data', 'tone-log.json');
+/** 只留最近这么多条，多的从最老的开始丢。 */
+const TONE_LOG_MAX = 15;
+
+/** 硬伤词：一出现基本就露馅，每个 3 分。[命中词, 建议] */
+const HARD_WORDS: [string, string][] = [
+  ['值得注意的是', '对了'],
+  ['值得关注的是', '对了'],
+  ['需要强调的是', '提醒一句'],
+  ['需要注意的是', '另外'],
+  ['综上所述', '就这么着'],
+  ['总而言之', '反正'],
+  ['简而言之', '反正'],
+  ['一言以蔽之', '说到底'],
+  ['换句话说', '也就是说'],
+  ['与此同时', '同时'],
+  ['在某种程度上', '有点'],
+  ['不可否认', ''],
+  ['毋庸置疑', ''],
+  ['毫无疑问', ''],
+  ['赋能', '帮上忙'],
+  ['抓手', '办法'],
+  ['闭环', '一圈走完'],
+  ['生态', '一圈人'],
+  ['链路', '路径'],
+  ['范式', '套路'],
+  ['维度', '方面'],
+  ['协同', '配合'],
+  ['沉淀', '攒下'],
+  ['落地', '做成'],
+  ['复盘', '回头看'],
+  ['对齐', '说清楚'],
+  ['颗粒度', '细到什么程度'],
+  ['底层逻辑', '根上是怎么回事'],
+  ['顶层设计', '大方向'],
+  ['方法论', '办法'],
+  ['让我们', '删除'],
+  ['希望对你有所帮助', '删除'],
+  ['如果你还有任何问题', '删除'],
+  ['欢迎随时', '删除'],
+  ['有什么我可以帮你的', '删除'],
+  ['一句话总结', ''],
+  ['在这里我想', ''],
+];
+
+/** 抽象软词：单个 1 分。 */
+const SOFT_WORDS = [
+  '此外', '因此', '然而', '从而', '进而', '鉴于', '基于', '综上',
+  '层面', '机制', '体系', '整体', '全面', '深度', '核心', '关键',
+  '场景', '路径', '趋势', '格局',
+];
+
+/** 句式：每个 2 分（除非另注 weight）。 */
+const PATTERNS: { re: RegExp; category: string; hit: string; advice: string; weight: number }[] = [
+  { re: /不是[^。！？；\n]{1,15}而是/, category: '句式', hit: '不是……而是', advice: '直接说那个「是」的。', weight: 2 },
+  { re: /不仅[^。！？；\n]{1,20}(?:更|还|而且)/, category: '句式', hit: '不仅……更', advice: '砍掉前半截。', weight: 2 },
+  { re: /一方面[^。！？\n]{1,30}另一方面/, category: '句式', hit: '一方面……另一方面', advice: '说一件事就够。', weight: 2 },
+  { re: /首先[^。！？\n]{1,40}其次/, category: '句式', hit: '首先……其次', advice: '别排队编号。', weight: 2 },
+  { re: /(?:进行|加以)(?:了)?[\u4e00-\u9fa5]{2}/, category: '句式', hit: '进行+动词', advice: '把「进行」去掉，动词直接用。', weight: 2 },
+  { re: /被[\u4e00-\u9fa5]{2,}所/, category: '句式', hit: '被……所', advice: '「被他骂了」，不是「被他所骂」。', weight: 2 },
+  { re: /作为(?:一个|一名|一位)/, category: '句式', hit: '作为一个', advice: '不用先报身份。', weight: 2 },
+  { re: /当[^。！？\n]{2,20}的时候/, category: '句式', hit: '当……的时候', advice: '「你走的时候」，四个字。', weight: 2 },
+  { re: /随时找我|随时联系|随时喊我/, category: '讨好', hit: '随时找我', advice: '这句是客服话术。', weight: 2 },
+  { re: /我理解你的感受|我理解您的心情/, category: '讨好', hit: '我理解你的感受', advice: '真理解就接住那件事，别说这四个字。', weight: 2 },
+  { re: /一起加油|我相信你(?:一定)?可以|你可以的/, category: '讨好', hit: '打气话', advice: '打气像模板。', weight: 2 },
+  { re: /希望(?:这|以上|它)[^。！？\n]{0,20}[。！]?$/, category: '句式', hit: '希望……结尾', advice: '结尾别许愿。', weight: 2 },
+  // —— 以下是实测里真被忽略掉的腔调 ——
+  { re: /——[^。！？!?\n]{6,}/, category: '翻译腔', hit: '破折号补丁腔', advice: '破折号后面兜的那句，断成一句话单独说。', weight: 2 },
+  { re: /不是[^。！？；\n]{1,15}[，,][ \t]*(?:就)?是[^。！？；\n]{1,20}/, category: '翻译腔', hit: '「不是A,是B」对举', advice: '留着 B 就行。', weight: 2 },
+  { re: /[；;]/, category: '翻译腔', hit: '分号', advice: '聊天里没人用分号，断句。', weight: 2 },
+  { re: /：[^。！？!?\n]{10,}/, category: '小作文', hit: '冒号展开', advice: '冒号后面那一串，另起一句说。', weight: 1 },
+  { re: /^[^，。！？\n]{2,15}(?:我知道|我清楚|我了解)[，,]/m, category: '小作文', hit: '定义式开场', advice: '「X 我知道」是百科腔，直接接话。', weight: 2 },
+  { re: /[^。！？；\n]{4,}的话[，,]/, category: '讨好', hit: '「……的话」铺垫', advice: '别先绕一句缓冲。', weight: 1 },
+  { re: /(?:我也可以|我也能|我还能|我这边也)/, category: '讨好', hit: '主动加码', advice: '连着给选项显得在讨好。', weight: 2 },
+  { re: /(?:先跟你说一声|跟你说一声|我告诉你|我陪你)/, category: '汇报腔', hit: '汇报腔', advice: '直接说事。', weight: 1 },
+  { re: /(?:默认我|我按[^。！？，\n]{2,10}的来|按默认)/, category: '方案化', hit: '方案化收尾', advice: '「默认我怎样」是产品文案。', weight: 2 },
+  // 夸张评价收尾：把形容词往死里用，一句一个「狠/损/刀」。
+  { re: /(?:太(?:狠|损|绝|毒|扎心|顶了)了|全是(?:刀|刀子)|刀刀|破防了|顶不住了|看傻|看了直冒冷汗)/, category: '升华', hit: '夸张评价词', advice: '「狠/损/全是刀」这类词一条一个就够，别句句都来。', weight: 2 },
+  // 「比……还……」，把话说得比事情本身还重。
+  { re: /比[^。！？；\n]{1,20}(?:还|更)[\u4e00-\u9fa5]/, category: '升华', hit: '「比…还…」比较级', advice: '别把话抬得比事本身还重，说事就行。', weight: 2 },
+];
+
+const MAX_CHARS = 12000;
+
+export interface ToneFinding {
+  category: string;
+  hit: string;
+  advice: string;
+  weight: number;
+}
+
+export interface ToneReport {
+  level: '通过' | '轻' | '中' | '重';
+  total: number;
+  hardness: number;
+  density: number;
+  chars: number;
+  findings: ToneFinding[];
+}
+
+function count(text: string, word: string): number {
+  let n = 0;
+  let at = text.indexOf(word);
+  while (at !== -1) {
+    n += 1;
+    at = text.indexOf(word, at + word.length);
+  }
+  return n;
+}
+
+/** 跑一遍规则，不联网、不调模型。 */
+export function toneAnalyze(raw: string): ToneReport {
+  const text = String(raw ?? '').slice(0, MAX_CHARS);
+  const findings: ToneFinding[] = [];
+  let hardness = 0;
+
+  for (const [word, advice] of HARD_WORDS) {
+    const n = count(text, word);
+    if (n === 0) continue;
+    hardness += n;
+    findings.push({ category: 'AI 惯用词', hit: word, advice, weight: 3 * n });
+  }
+
+  const softSeen = new Set<string>();
+  for (const word of SOFT_WORDS) {
+    if (softSeen.has(word)) continue;
+    const n = count(text, word);
+    if (n === 0) continue;
+    softSeen.add(word);
+    findings.push({ category: 'AI 惯用词', hit: word, advice: '这词抽象，换成具体的事。', weight: n });
+  }
+
+  for (const p of PATTERNS) {
+    if (!p.re.test(text)) continue;
+    findings.push({ category: p.category, hit: p.hit, advice: p.advice, weight: p.weight });
+  }
+
+  // 顿号三连、三项还一样长：「号码无效、你好旧友、查无回应」。
+  // 人随手举例，长短不齐也不会凑成齐刷刷的三项。短消息里的枚举多半是正常清单，放长到 25 字以上再看。
+  if (text.length >= 25) {
+    const runs = text.match(/[\u4e00-\u9fa5]{2,8}(?:、[\u4e00-\u9fa5]{2,8}){2,}/g) ?? [];
+    for (const run of runs) {
+      const parts = run.split('、').map((s) => s.length);
+      if (parts.length >= 3 && Math.min(...parts) >= 3 && Math.max(...parts) - Math.min(...parts) <= 1) {
+        findings.push({ category: '小作文', hit: `三项等长（${parts.join('/')}）`, advice: '举例子别凑成一样长的三项。', weight: 2 });
+        break;
+      }
+    }
+  }
+
+  // 一口气太长没喘气——一两句话的人不会这么写。
+  const clauses = text.split(/[。！？!?\n]/).map((s) => s.trim()).filter(Boolean);
+  const longest = clauses.length ? Math.max(...clauses.map((s) => s.length)) : 0;
+  if (longest > 38) findings.push({ category: '小作文', hit: `一口气 ${longest} 字没喘`, advice: '这句中间断开，说成两三口。', weight: 2 });
+
+  // 一条消息太长：真人聊天一条很少过三行，长篇大论本身就是最明显的人机味。
+  // 实测这台机器上 QQ 消息中位数 67 字、最长 185 字 —— 所以阈值按它自己的水核定。
+  const han = (text.match(/[\u4e00-\u9fa5]/g) ?? []).length;
+  if (han > 90) {
+    findings.push({ category: '小作文', hit: `一条 ${han} 字`, advice: '拆成两三条发，一条只说一件事。', weight: 3 });
+  } else if (han > 60) {
+    findings.push({ category: '小作文', hit: `一条 ${han} 字`, advice: '砍掉一半，只留最想说的那句。', weight: 2 });
+  } else if (han > 40) {
+    findings.push({ category: '小作文', hit: `一条 ${han} 字`, advice: '还能再短点。', weight: 1 });
+  }
+
+  const total = findings.reduce((s, f) => s + f.weight, 0);
+  const chars = Math.max(han, 80);
+  const density = Number((total / (chars / 70)).toFixed(1));
+  const level: ToneReport['level'] = !findings.length
+    ? '通过'
+    : hardness >= 2 || density >= 9
+      ? '重'
+      : hardness >= 1 || density >= 3.5
+        ? '中'
+        : '轻';
+
+  return { level, total, hardness, density, chars: text.length, findings };
+}
+
+/**
+ * 附在 `pet_say` / `qq_send` 回执后面的一句话。干净或者只是「轻」就返回空串（不出声）。
+ *
+ * 顺手记一条「真发出去了」的账（`where` 说明从哪儿发的）。记账失败不影响返回值。
+ */
+export function toneNote(raw: string, where = 'qq_send'): string {
+  const text = String(raw ?? '');
+  if (!text.trim()) return '';
+  if (text.trim().length < 8) {
+    // 太短不做判定，但确实发出去了——面板上要有这一条。
+    appendToneLog({ ok: true, text, level: '通过', density: 0, hits: '', where });
+    return '';
+  }
+  const r = toneAnalyze(text);
+  if (r.level === '通过' || r.level === '轻') {
+    appendToneLog({ ok: true, text, level: r.level, density: r.density, hits: '', where });
+    return '';
+  }
+
+  const top = [...r.findings].sort((a, b) => b.weight - a.weight).slice(0, 3);
+  const hits = top.map((f) => f.hit).join('、');
+  const advice = top[0]?.advice ?? '';
+  const tail = advice ? ` → ${advice}` : '';
+  return `\n[腔调] ${r.level}（密度 ${r.density}）：${hits}${tail}`;
+}
+
+/**
+ * 发送前的闸门：判「中」以上就不放行，返回拦下来的回执；干净或「轻」返回 null（照常发）。
+ *
+ * 和 `toneNote` 的分工：`toneNote` 是发完之后的提醒，模型可以不理；这个是**发不出去**，
+ * 想过就得真改。只拦「中/重」——「轻」不拦，免得随口一句话也被挡。
+ * 拦下时顺手记一条账，面板上能看到被挡的原话。
+ */
+export function toneGate(raw: string, where = 'qq_send'): { block: string; level: string; density: number; hits: string } | null {
+  if (!raw || raw.trim().length < 8) return null;
+  const r = toneAnalyze(raw);
+  if (r.level !== '中' && r.level !== '重') return null;
+
+  const top = [...r.findings].sort((a, b) => b.weight - a.weight).slice(0, 4);
+  const hits = top.map((f) => f.hit).join('、');
+  const advice = top[0]?.advice ?? '';
+  appendToneLog({ ok: false, text: raw, level: r.level, density: r.density, hits, where });
+  const block = [
+    `[没发出去] 这条腔调不对（${r.level}，密度 ${r.density}）：${hits}`,
+    advice ? `改法：${advice}` : '',
+    '把话改短、把那几处拆开，再调用一次。别原样重发——原样重发还是会被挡。',
+  ].filter(Boolean).join('\n');
+  return { block, level: r.level, density: r.density, hits };
+}
+
+export interface ToneLogEntry {
+  /** 本地时间，形如 2026-10-28 21:52:03 */
+  time: string;
+  /** true = 真发出去了；false = 被闸门拦下 */
+  ok: boolean;
+  /** 原话（拦下的就是被挡那版；发出去的就是实际发的那版） */
+  text: string;
+  /** 等级：通过 / 轻 / 中 / 重 */
+  level: string;
+  density: number;
+  /** 命中的毛病，一行文字 */
+  hits: string;
+  /** 从哪儿发的：qq_send / pet_say */
+  where: string;
+}
+
+function readLogRaw(): ToneLogEntry[] {
+  try {
+    const parsed = JSON.parse(readFileSync(TONE_LOG_PATH, 'utf8')) as { items?: ToneLogEntry[] };
+    return Array.isArray(parsed.items) ? parsed.items : [];
+  } catch {
+    return [];
+  }
+}
+
+function nowText(): string {
+  const d = new Date();
+  const p = (n: number) => String(n).padStart(2, '0');
+  return `${d.getFullYear()}-${p(d.getMonth() + 1)}-${p(d.getDate())} ${p(d.getHours())}:${p(d.getMinutes())}:${p(d.getSeconds())}`;
+}
+
+/**
+ * 记一条：这次说了什么、发没发出去、为什么。
+ * 只留最近 TONE_LOG_MAX 条，超了从最老的丢。写不进去就算了，绝不因为记录失败影响发送。
+ */
+export function appendToneLog(entry: Omit<ToneLogEntry, 'time'>): void {
+  try {
+    const items = readLogRaw();
+    items.push({ time: nowText(), ...entry });
+    while (items.length > TONE_LOG_MAX) items.shift();
+    writeFileSync(TONE_LOG_PATH, JSON.stringify({ items }, null, 2), 'utf8');
+  } catch {
+    // 记录失败不影响说话
+  }
+}
+
+/** 面板读用：最新的在前。 */
+export function readToneLog(): ToneLogEntry[] {
+  return readLogRaw().reverse();
+}
+
