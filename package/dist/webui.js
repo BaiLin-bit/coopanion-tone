@@ -44,6 +44,10 @@ function copyText(text, ui) {
 function mountToneLog(ctx) {
   const { root, ui } = ctx;
 
+  // 声明必须在使用之前：下面的接入指南文案会立即读 currentPort。
+  let currentPort = null;
+  let stopped = false;
+
   const wrap = el('div', 'ctl-wrap');
 
   const head = el('div', 'ctl-head');
@@ -105,8 +109,7 @@ function mountToneLog(ctx) {
   wrap.append(head, serviceLine, note, list, empty, guide);
   root.appendChild(wrap);
 
-  let stopped = false;
-  let currentPort = null;
+  // stopped / currentPort 已在函数开头声明
 
   function renderService(service) {
     currentPort = service?.port ?? null;
