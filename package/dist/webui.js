@@ -64,9 +64,12 @@ function mountToneLog(ctx) {
   const summary = el('summary', 'ctl-guide-title', '想让它真的拦住？点这里看怎么接');
   const guideBody = el('div', 'ctl-guide-body');
 
-  const intro = el('p', 'ctl-guide-p', '这个扩展不改任何人的代码。想让它拦住某处的发言，需要在那个 World 发送前调一下下面的检查服务——你自己改，或者把下面这段话复制给你的 AI 让它改。');
+  const intro = el('p', 'ctl-guide-p', '这个扩展不改任何人的代码。想让它拦住某处的发言，需要在那个 World 发送前调一下下面的检查服务——你自己改，或者复制提示词让 AI 改。');
+
+  const snippetTitle = el('p', 'ctl-guide-p', '示例：QQ（包 cortico-world-qq-final-beta，world id qqbot，工具 qq_send）。别的世界变量名、返回结构、是否 async 都不一样，按实际改。');
 
   const snippet = [
+    '// 示例：QQ 的 qq_send（cortico-world-qq-final-beta / qqbot）',
     'const r = await fetch(`http://127.0.0.1:<端口>/check`, {',
     "  method: 'POST',",
     "  headers: { 'content-type': 'application/json' },",
@@ -76,9 +79,11 @@ function mountToneLog(ctx) {
     '// block 为 null 就照常发',
   ].join('\n');
   const pre = el('pre', 'ctl-code', snippet);
-  const copyBtn = el('button', 'ctl-btn', '复制代码');
+  const copyBtn = el('button', 'ctl-btn', '复制这段示例');
   copyBtn.type = 'button';
   copyBtn.addEventListener('click', () => copyText(snippet.replace('<端口>', String(currentPort || '18770')), ui));
+
+  const idNote = el('p', 'ctl-guide-p', '四个世界的包名 / world id / 工具名 / 文件位置，见仓库里的 docs/接入指南.md。别搞混：cortico-world-qq（id qq，工具 qq.send）和 cortico-world-qq-final-beta（id qqbot，工具 qq_send）是两个不同的包。');
 
   const promptText = [
     '帮我改一下这个 Coopanion 安装里的发言出口，让它在发送前先问一下本地的腔调检查服务。',
@@ -103,7 +108,7 @@ function mountToneLog(ctx) {
 
   const warn = el('p', 'ctl-guide-p ctl-warn', '注意：改的是 Coopanion 安装目录里的文件，升级会被覆盖。改之前务必备份，改完记下改了哪里。');
 
-  guideBody.append(intro, pre, copyBtn, promptPre, copyPromptBtn, warn);
+  guideBody.append(intro, snippetTitle, pre, copyBtn, idNote, promptPre, copyPromptBtn, warn);
   guide.append(summary, guideBody);
 
   wrap.append(head, serviceLine, note, list, empty, guide);
